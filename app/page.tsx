@@ -2,10 +2,50 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe2, Mic, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+// Local minimal UI components (replaces '@/components/ui/*' to avoid module path issues)
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { className?: string };
+function Button({ className = "", ...props }: ButtonProps) {
+  return (
+    <button
+      className={
+        "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " +
+        className
+      }
+      {...props}
+    />
+  );
+}
+
+function Card({ className = "", ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={"rounded-xl border bg-white/5 " + className} {...props} />;
+}
+function CardContent({ className = "", ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={"p-4 " + className} {...props} />;
+}
+
+type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { className?: string };
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className = "", ...props }, ref) => (
+    <input
+      ref={ref}
+      className={
+        "w-full rounded-md border bg-white px-3 py-2 text-sm text-black focus:outline-none focus-visible:ring-2 " +
+        className
+      }
+      {...props}
+    />
+  )
+);
+Input.displayName = "Input";
+
+function Progress({ value = 0, className = "" }: { value?: number; className?: string }) {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className={"relative h-2 w-full rounded bg-black/20 " + className}>
+      <div className="h-full rounded bg-white/80 transition-[width]" style={{ width: `${v}%` }} />
+    </div>
+  );
+}
 
 const brand = {
   name: "SitePlus",
