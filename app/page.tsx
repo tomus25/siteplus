@@ -319,6 +319,15 @@ export default function LandingPrototype() {
           <span>© 2025 {brand.name}</span>
           <span className="text-center sm:text-right">Beta • Transparent • Privacy First</span>
         </div>
+        <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0FVQQFK96Q"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-0FVQQFK96Q');
+</script>
       </footer>
     </div>
   );
