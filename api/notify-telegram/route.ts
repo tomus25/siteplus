@@ -1,6 +1,10 @@
 // app/api/notify-telegram/route.ts
 import { NextResponse } from "next/server";
 
+// Гарантируем отсутствие кеша и всегда динамический ответ
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(req: Request) {
   try {
     const { kind, idea, email } = await req.json();
@@ -10,18 +14,22 @@ export async function POST(req: Request) {
 
     if (!token || !chatId) {
       return NextResponse.json(
-        { error: "Server is not configured: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" },
+        { error: "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" },
         { status: 500 }
       );
     }
 
-    // Текст «минимализм»: три пункта. Если email нет — только 2 пункта.
+    // ✂️ НИКАКИХ domain/locale/ua/time — только минимум
+    // Формат:
+    // 🆕 Новая заявка
+    // Email: <email>        // если есть
+    // Описание: <idea>      // если есть
     const lines: string[] = ["🆕 Новая заявка"];
-    if (kind === "email" && email) {
-      lines.push(`Email: ${String(email).trim()}`);
+    if (kind === "email" && typeof email === "string" && email.trim()) {
+      lines.push(`Email: ${email.trim()}`);
     }
-    if (idea) {
-      lines.push(`Описание: ${String(idea).trim()}`);
+    if (typeof idea === "string" && idea.trim()) {
+      lines.push(`Описание: ${idea.trim()}`);
     }
 
     const text = lines.join("\n");
@@ -30,18 +38,5 @@ export async function POST(req: Request) {
     const tgRes = await fetch(tgUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Без форматирования, чтобы не было сюрпризов с Markdown/HTML
-      body: JSON.stringify({ chat_id: chatId, text }),
-      cache: "no-store",
-    });
-
-    if (!tgRes.ok) {
-      const err = await tgRes.text();
-      return NextResponse.json({ error: `Telegram error: ${err}` }, { status: 502 });
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 400 });
-  }
-}
+      // Без Markdown/HTML — plain text
+      body: JSON.strin
