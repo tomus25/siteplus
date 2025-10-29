@@ -29,7 +29,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     <input
       ref={ref}
       className={
-        "w-full rounded-md border bg-white px-3 py-2 text-sm text-black focus:outline-none focus-visible:ring-2 " +
+        "w-full rounded-md border bg-white px-3 py-2 text-base md:text-sm text-black focus:outline-none focus-visible:ring-2 " +
         className
       }
       {...props}
@@ -112,6 +112,7 @@ export default function LandingPrototype() {
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<"idle" | "generating" | "done">("idle");
   const [previewSrcDoc, setPreviewSrcDoc] = useState<string>("");
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const [email, setEmail] = useState("");
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -207,6 +208,8 @@ export default function LandingPrototype() {
   const handleGenerate = () => {
     if (!idea.trim()) return;
     setStage("generating");
+    // Smooth scroll to preview block immediately
+    setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     const html = composePreviewDocument(generateBlurredDemoHTML(idea));
     setTimeout(() => {
       setPreviewSrcDoc(html);
@@ -256,10 +259,10 @@ export default function LandingPrototype() {
               Write your idea in a few words
             </label>
             <div className="relative">
-              <Input id="idea" value={idea} onChange={(e) => setIdea(e.target.value)} placeholder='Example: "Online flower shop" or "Fitness coach landing"' className="h-16 rounded-2xl bg-white text-black placeholder:text-black/50 border-0 shadow-sm focus-visible:ring-4 focus-visible:ring-white/60" />
+              <Input id="idea" value={idea} onChange={(e) => setIdea(e.target.value)} placeholder='Example: "Online flower shop" or "Fitness coach landing"' className="h-16 rounded-2xl bg-white text-black placeholder:text-black/50 border-0 shadow-sm focus-visible:ring-4 focus-visible:ring-white/60 text-base" />
               <button type="button" onClick={recognizing ? stopVoice : startVoice} className={`absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 rounded-xl px-3 py-3 focus:outline-none focus-visible:ring-4 ${recognizing ? "bg-red-500 text-white" : "bg-black/90 text-white hover:bg-black"}`} aria-label={recognizing ? "Stop recording" : "Start voice input"}>
                 <Mic className="size-5" />
-                <span className="text-xs hidden sm:inline">{recognizing ? "Recording…" : "Voice"}</span>
+                <span className="text-xs hidden md:inline">{recognizing ? "Recording…" : "Voice"}</span>
               </button>
             </div>
             <Button onClick={handleGenerate} className="h-14 rounded-2xl bg-white text-black hover:bg-white/90 px-8 mx-auto text-base font-semibold focus-visible:ring-4 focus-visible:ring-white/50">
@@ -267,7 +270,7 @@ export default function LandingPrototype() {
             </Button>
           </div>
 
-          <div className="mt-12 w-full">
+          <div ref={previewRef} className="mt-12 w-full">
             <Card className="rounded-3xl border-white/10 bg-neutral-900/70 backdrop-blur-md">
               <CardContent className="p-6 lg:p-8">
                 <AnimatePresence mode="wait">
@@ -288,7 +291,7 @@ export default function LandingPrototype() {
                             <div className="text-xs text-black/70 mb-2 text-center">
                               Domain: <span className="font-semibold text-black">{suggestSubdomainFromIdea(idea)}</span>
                             </div>
-                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-12 rounded-xl bg-white text-black placeholder:text-black/60 border border-black/10" />
+                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-12 rounded-xl bg-white text-black placeholder:text-black/60 border border-black/10 text-base" />
                             {emailErr && <div className="text-red-500 text-xs mt-1 text-center">{emailErr}</div>}
                             <Button onClick={submitEmail} disabled={sending} className="h-12 rounded-xl bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed w-full mt-3">
                               {sending ? "Sending…" : "Send Access Info"}
