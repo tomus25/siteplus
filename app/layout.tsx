@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import Script from "next/script"; // 👈 добавляем импорт
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "SitePlus — Instant Website Prototype",
@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ✅ Google Analytics (gtag.js) */}
+        {/* Google Analytics */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-0FVQQFK96Q"
           strategy="afterInteractive"
