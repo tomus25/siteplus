@@ -2,7 +2,8 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe2, Mic, Sparkles } from "lucide-react";
-// Local minimal UI components (replaces '@/components/ui/*' to avoid module path issues)
+
+// Local minimal UI components (inline to avoid path issues)
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { className?: string };
 function Button({ className = "", ...props }: ButtonProps) {
   return (
@@ -24,18 +25,16 @@ function CardContent({ className = "", ...props }: React.HTMLAttributes<HTMLDivE
 }
 
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { className?: string };
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className = "", ...props }, ref) => (
-    <input
-      ref={ref}
-      className={
-        "w-full rounded-md border bg-white px-3 py-2 text-base md:text-sm text-black focus:outline-none focus-visible:ring-2 " +
-        className
-      }
-      {...props}
-    />
-  )
-);
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className = "", ...props }, ref) => (
+  <input
+    ref={ref}
+    className={
+      "w-full rounded-md border bg-white px-3 py-2 text-base md:text-sm text-black focus:outline-none focus-visible:ring-2 " +
+      className
+    }
+    {...props}
+  />
+));
 Input.displayName = "Input";
 
 function Progress({ value = 0, className = "" }: { value?: number; className?: string }) {
@@ -63,9 +62,7 @@ function calcProgress(elapsed: number, totalMs: number) {
 }
 
 function composePreviewDocument(bodyInnerHtml: string) {
-  const safe =
-    bodyInnerHtml ||
-    "<main><h1>New Website</h1><p>Preview is empty.</p></main>";
+  const safe = bodyInnerHtml || "<main><h1>New Website</h1><p>Preview is empty.</p></main>";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><style>html{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;padding:24px;background:#0b0b0b;color:#f1f1f1}</style></head><body>${safe}</body></html>`;
 }
 
@@ -74,12 +71,9 @@ function validateEmail(email: string) {
 }
 
 function suggestSubdomainFromIdea(idea: string) {
-  const slug = idea
-    .toLowerCase()
-    .split(" ")[0]
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 20) || "your-site";
+  const slug =
+    idea.toLowerCase().split(" ")[0].replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 20) ||
+    "your-site";
   return `${slug}.siteplus.app`;
 }
 
@@ -113,6 +107,7 @@ export default function LandingPrototype() {
   const [stage, setStage] = useState<"idle" | "generating" | "done">("idle");
   const [previewSrcDoc, setPreviewSrcDoc] = useState<string>("");
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
   const [email, setEmail] = useState("");
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -164,6 +159,14 @@ export default function LandingPrototype() {
     return () => cancelAnimationFrame(raf);
   }, [stage]);
 
+  // Focus email when preview is ready
+  useEffect(() => {
+    if (stage === "done") {
+      const id = setTimeout(() => emailInputRef.current?.focus({ preventScroll: true } as any), 60);
+      return () => clearTimeout(id);
+    }
+  }, [stage]);
+
   // Demo HTML for blurred preview
   function generateBlurredDemoHTML(subject: string) {
     const title = subject?.trim() ? subject : "Your Next Website";
@@ -176,26 +179,28 @@ export default function LandingPrototype() {
       </main>`;
   }
 
-  // Send to server (Telegram forward handled server-side)
+  // --- server notifications (INSIDE component to access state) ---
+  async function notifyTelegram(kind: "idea" | "email", payload: Record<string, any>) {
+    const res = await fetch("/api/notify-telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, ...payload }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  // Send email as a second step (full submission)
   async function submitEmail() {
     const ok = validateEmail(email);
     setEmailErr(ok ? null : "Enter a valid email");
     if (!ok) return;
     try {
       setSending(true);
-      const res = await fetch("/api/notify-telegram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idea,
-          email,
-          domain: suggestSubdomainFromIdea(idea),
-          locale: navigator.language,
-          userAgent: navigator.userAgent,
-          ts: new Date().toISOString(),
-        }),
+      await notifyTelegram("email", {
+        idea,
+        email,
+        domain: suggestSubdomainFromIdea(idea),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       alert("Thanks! We’ve recorded your request. You’ll get an invite by email.");
     } catch (e) {
       console.error(e);
@@ -208,6 +213,12 @@ export default function LandingPrototype() {
   const handleGenerate = () => {
     if (!idea.trim()) return;
     setStage("generating");
+    // Send a minimal 'idea' event (partial submission). Server will read IP/country from headers.
+    notifyTelegram("idea", {
+      idea,
+      domain: suggestSubdomainFromIdea(idea),
+    }).catch((e) => console.warn("notify idea failed", e));
+
     // Smooth scroll to preview block immediately
     setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     const html = composePreviewDocument(generateBlurredDemoHTML(idea));
@@ -247,7 +258,12 @@ export default function LandingPrototype() {
 
       <main id="main" className="mx-auto max-w-3xl px-4">
         <section className="py-16 lg:py-24 flex flex-col items-center text-center">
-          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="text-5xl lg:text-7xl font-extrabold leading-tight tracking-tight">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="text-5xl lg:text-7xl font-extrabold leading-tight tracking-tight"
+          >
             Build Your Website in 1 Second
           </motion.h1>
           <p className="mt-4 text-lg lg:text-xl text-white/85 max-w-2xl">
@@ -259,13 +275,27 @@ export default function LandingPrototype() {
               Write your idea in a few words
             </label>
             <div className="relative">
-              <Input id="idea" value={idea} onChange={(e) => setIdea(e.target.value)} placeholder='Example: "Online flower shop" or "Fitness coach landing"' className="h-16 rounded-2xl bg-white text-black placeholder:text-black/50 border-0 shadow-sm focus-visible:ring-4 focus-visible:ring-white/60 text-base" />
-              <button type="button" onClick={recognizing ? stopVoice : startVoice} className={`absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 rounded-xl px-3 py-3 focus:outline-none focus-visible:ring-4 ${recognizing ? "bg-red-500 text-white" : "bg-black/90 text-white hover:bg-black"}`} aria-label={recognizing ? "Stop recording" : "Start voice input"}>
+              <Input
+                id="idea"
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                placeholder='Example: "Online flower shop" or "Fitness coach landing"'
+                className="h-16 rounded-2xl bg-white text-black placeholder:text-black/50 border-0 shadow-sm focus-visible:ring-4 focus-visible:ring-white/60 text-base"
+              />
+              <button
+                type="button"
+                onClick={recognizing ? stopVoice : startVoice}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 rounded-xl px-3 py-3 focus:outline-none focus-visible:ring-4 ${recognizing ? "bg-red-500 text-white" : "bg-black/90 text-white hover:bg-black"}`}
+                aria-label={recognizing ? "Stop recording" : "Start voice input"}
+              >
                 <Mic className="size-5" />
                 <span className="text-xs hidden md:inline">{recognizing ? "Recording…" : "Voice"}</span>
               </button>
             </div>
-            <Button onClick={handleGenerate} className="h-14 rounded-2xl bg-white text-black hover:bg-white/90 px-8 mx-auto text-base font-semibold focus-visible:ring-4 focus-visible:ring-white/50">
+            <Button
+              onClick={handleGenerate}
+              className="h-14 rounded-2xl bg-white text-black hover:bg-white/90 px-8 mx-auto text-base font-semibold focus-visible:ring-4 focus-visible:ring-white/50"
+            >
               <Sparkles className="mr-2 size-5" /> Generate Website
             </Button>
           </div>
@@ -278,7 +308,12 @@ export default function LandingPrototype() {
                     <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                       <div className="relative rounded-2xl border border-white/10 overflow-hidden">
                         <div className="pointer-events-none">
-                          <iframe title="Preview" className="w-full h-[520px] bg-neutral-900 filter blur-md scale-[1.01]" sandbox="allow-same-origin" srcDoc={previewSrcDoc} />
+                          <iframe
+                            title="Preview"
+                            className="w-full h-[520px] bg-neutral-900 filter blur-md scale-[1.01]"
+                            sandbox="allow-same-origin"
+                            srcDoc={previewSrcDoc}
+                          />
                         </div>
                         <div className="absolute inset-0 grid place-items-center">
                           <div className="max-w-md w-[92%] rounded-2xl backdrop-blur-2xl bg-white/90 text-black border border-white/20 p-6 text-left shadow-2xl">
@@ -291,9 +326,23 @@ export default function LandingPrototype() {
                             <div className="text-xs text-black/70 mb-2 text-center">
                               Domain: <span className="font-semibold text-black">{suggestSubdomainFromIdea(idea)}</span>
                             </div>
-                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-12 rounded-xl bg-white text-black placeholder:text-black/60 border border-black/10 text-base" />
+                            <Input
+                              ref={emailInputRef}
+                              type="email"
+                              inputMode="email"
+                              enterKeyHint="send"
+                              autoComplete="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="you@example.com"
+                              className="h-12 rounded-xl bg-white text-black placeholder:text-black/60 border border-black/10 text-base"
+                            />
                             {emailErr && <div className="text-red-500 text-xs mt-1 text-center">{emailErr}</div>}
-                            <Button onClick={submitEmail} disabled={sending} className="h-12 rounded-xl bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed w-full mt-3">
+                            <Button
+                              onClick={submitEmail}
+                              disabled={sending}
+                              className="h-12 rounded-xl bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed w-full mt-3"
+                            >
                               {sending ? "Sending…" : "Send Access Info"}
                             </Button>
                             <div className="text-[11px] text-black/60 mt-2 text-center">
@@ -319,15 +368,6 @@ export default function LandingPrototype() {
           <span>© 2025 {brand.name}</span>
           <span className="text-center sm:text-right">Beta • Transparent • Privacy First</span>
         </div>
-        <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-0FVQQFK96Q"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-0FVQQFK96Q');
-</script>
       </footer>
     </div>
   );
