@@ -3,6 +3,18 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe2, Mic, Sparkles } from "lucide-react";
 
+// ==== GA: типы окна для TS ====
+declare global {
+  interface Window {
+    dataLayer: any[];
+    gtag: (...args: any[]) => void;
+    gtagInitialized?: boolean;
+  }
+}
+
+// ==== GA: твой measurement ID ====
+const GA_ID = "G-0FVQQFK96Q";
+
 // Local minimal UI components (inline to avoid path issues)
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { className?: string };
 function Button({ className = "", ...props }: ButtonProps) {
@@ -114,6 +126,37 @@ export default function LandingPrototype() {
   const [recognizing, setRecognizing] = useState(false);
   const recognitionRef = useRef<any>(null);
 
+  // ==== Google Analytics: инициализация ====
+  useEffect(() => {
+    if (typeof window === "undefined" || window.gtagInitialized) return;
+
+    // Очередь команд до загрузки gtag.js
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function gtag() {
+      window.dataLayer.push(arguments);
+    };
+
+    // Подключаем скрипт gtag.js
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+    script.id = "ga-script";
+    document.head.appendChild(script);
+
+    // Базовая инициализация и первый page_view
+    window.gtag("js", new Date());
+    window.gtag("config", GA_ID);
+
+    window.gtagInitialized = true;
+  }, []);
+
+  // ====== (опционально) событие page_view при монтировании ======
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "page_view");
+    }
+  }, []);
+
   // Speech: start/stop
   const startVoice = () => {
     const w: any = window as any;
@@ -201,6 +244,15 @@ export default function LandingPrototype() {
         email,
         domain: suggestSubdomainFromIdea(idea),
       });
+
+      // ==== GA: отправим событие успешной отправки email ====
+      if (typeof window !== "undefined" && window.gtag) {
+        window.gtag("event", "submit_email", {
+          event_category: "conversion",
+          value: 1,
+        });
+      }
+
       alert("Thanks! We’ve recorded your request. You’ll get an invite by email.");
     } catch (e) {
       console.error(e);
@@ -212,6 +264,15 @@ export default function LandingPrototype() {
 
   const handleGenerate = () => {
     if (!idea.trim()) return;
+
+    // ==== GA: клик на Generate ====
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", "generate_click", {
+        event_category: "engagement",
+        idea_length: idea.trim().length,
+      });
+    }
+
     setStage("generating");
     // Send a minimal 'idea' event (partial submission). Server will read IP/country from headers.
     notifyTelegram("idea", {
