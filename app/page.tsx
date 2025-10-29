@@ -1,3 +1,4 @@
+"use client";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe2, Mic, Sparkles } from "lucide-react";
