@@ -3,19 +3,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe2, Mic, Sparkles } from "lucide-react";
 
-// ==== GA: типы окна для TS ====
-declare global {
-  interface Window {
-    dataLayer: any[];
-    gtag: (...args: any[]) => void;
-    gtagInitialized?: boolean;
-  }
-}
-
-// ==== GA: твой measurement ID ====
-const GA_ID = "G-0FVQQFK96Q";
-
-// Local minimal UI components (inline to avoid path issues)
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { className?: string };
 function Button({ className = "", ...props }: ButtonProps) {
   return (
@@ -28,7 +15,6 @@ function Button({ className = "", ...props }: ButtonProps) {
     />
   );
 }
-
 function Card({ className = "", ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={"rounded-xl border bg-white/5 " + className} {...props} />;
 }
@@ -49,39 +35,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className = "", 
 ));
 Input.displayName = "Input";
 
-function Progress({ value = 0, className = "" }: { value?: number; className?: string }) {
-  const v = Math.max(0, Math.min(100, value));
-  return (
-    <div className={"relative h-2 w-full rounded bg-black/20 " + className}>
-      <div className="h-full rounded bg-white/80 transition-[width]" style={{ width: `${v}%` }} />
-    </div>
-  );
-}
-
-const brand = {
-  name: "SitePlus",
-  accent: "from-gray-950 via-gray-900 to-black",
-  legal: {
-    disclaimer:
-      "This is a beta-stage product demonstration. Content and visuals are for illustrative purposes only.",
-  },
-};
-
 // ===== Utilities =====
 function calcProgress(elapsed: number, totalMs: number) {
   const ratio = Math.min(1, Math.max(0, elapsed / Math.max(1, totalMs)));
   return Math.floor(ratio * 100);
 }
-
 function composePreviewDocument(bodyInnerHtml: string) {
   const safe = bodyInnerHtml || "<main><h1>New Website</h1><p>Preview is empty.</p></main>";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><style>html{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;padding:24px;background:#0b0b0b;color:#f1f1f1}</style></head><body>${safe}</body></html>`;
 }
-
 function validateEmail(email: string) {
   return /.+@.+\..+/.test(email);
 }
-
 function suggestSubdomainFromIdea(idea: string) {
   const slug =
     idea.toLowerCase().split(" ")[0].replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 20) ||
@@ -89,31 +54,7 @@ function suggestSubdomainFromIdea(idea: string) {
   return `${slug}.siteplus.app`;
 }
 
-// Lightweight runtime tests (do not affect UI)
-(function runRuntimeTests() {
-  try {
-    console.assert(calcProgress(0, 1000) === 0, "calcProgress: start 0");
-    console.assert(calcProgress(1000, 1000) === 100, "calcProgress: end 100");
-    const mid = calcProgress(500, 1000);
-    console.assert(mid >= 49 && mid <= 51, "calcProgress: mid ~50");
-
-    const html = composePreviewDocument("<div>ok</div>");
-    console.assert(html.startsWith("<!doctype html>"), "composePreviewDocument: doctype");
-    console.assert(html.includes("<body>"), "composePreviewDocument: body wrapper");
-
-    console.assert(validateEmail("user@example.com") === true, "validateEmail: true");
-    console.assert(validateEmail("bad@") === false, "validateEmail: false");
-
-    console.assert(
-      suggestSubdomainFromIdea("") === "your-site.siteplus.app",
-      "suggestSubdomainFromIdea: default"
-    );
-  } catch (e) {
-    console.warn("Runtime tests failed:", e);
-  }
-})();
-
-export default function LandingPrototype() {
+export default function Page() {
   const [idea, setIdea] = useState("");
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<"idle" | "generating" | "done">("idle");
@@ -126,38 +67,7 @@ export default function LandingPrototype() {
   const [recognizing, setRecognizing] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  // ==== Google Analytics: инициализация ====
-  useEffect(() => {
-    if (typeof window === "undefined" || window.gtagInitialized) return;
-
-    // Очередь команд до загрузки gtag.js
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function gtag() {
-      window.dataLayer.push(arguments);
-    };
-
-    // Подключаем скрипт gtag.js
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
-    script.id = "ga-script";
-    document.head.appendChild(script);
-
-    // Базовая инициализация и первый page_view
-    window.gtag("js", new Date());
-    window.gtag("config", GA_ID);
-
-    window.gtagInitialized = true;
-  }, []);
-
-  // ====== (опционально) событие page_view при монтировании ======
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "page_view");
-    }
-  }, []);
-
-  // Speech: start/stop
+  // Voice
   const startVoice = () => {
     const w: any = window as any;
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
@@ -222,7 +132,7 @@ export default function LandingPrototype() {
       </main>`;
   }
 
-  // --- server notifications (INSIDE component to access state) ---
+  // --- server notifications (минимальные payload'ы)
   async function notifyTelegram(kind: "idea" | "email", payload: Record<string, any>) {
     const res = await fetch("/api/notify-telegram", {
       method: "POST",
@@ -239,20 +149,7 @@ export default function LandingPrototype() {
     if (!ok) return;
     try {
       setSending(true);
-      await notifyTelegram("email", {
-        idea,
-        email,
-        domain: suggestSubdomainFromIdea(idea),
-      });
-
-      // ==== GA: отправим событие успешной отправки email ====
-      if (typeof window !== "undefined" && window.gtag) {
-        window.gtag("event", "submit_email", {
-          event_category: "conversion",
-          value: 1,
-        });
-      }
-
+      await notifyTelegram("email", { idea, email });
       alert("Thanks! We’ve recorded your request. You’ll get an invite by email.");
     } catch (e) {
       console.error(e);
@@ -264,23 +161,10 @@ export default function LandingPrototype() {
 
   const handleGenerate = () => {
     if (!idea.trim()) return;
-
-    // ==== GA: клик на Generate ====
-    if (typeof window !== "undefined" && window.gtag) {
-      window.gtag("event", "generate_click", {
-        event_category: "engagement",
-        idea_length: idea.trim().length,
-      });
-    }
+    // 1-я заявка: только описание
+    notifyTelegram("idea", { idea }).catch((e) => console.warn("notify idea failed", e));
 
     setStage("generating");
-    // Send a minimal 'idea' event (partial submission). Server will read IP/country from headers.
-    notifyTelegram("idea", {
-      idea,
-      domain: suggestSubdomainFromIdea(idea),
-    }).catch((e) => console.warn("notify idea failed", e));
-
-    // Smooth scroll to preview block immediately
     setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     const html = composePreviewDocument(generateBlurredDemoHTML(idea));
     setTimeout(() => {
@@ -292,7 +176,7 @@ export default function LandingPrototype() {
   const Background = useMemo(() => {
     return (
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-br ${brand.accent}`} />
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-black" />
         <motion.div
           className="absolute w-[640px] h-[640px] bg-white/5 rounded-full blur-3xl top-[40%] left-1/2 -translate-x-1/2"
           animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.25, 0.1] }}
@@ -311,7 +195,7 @@ export default function LandingPrototype() {
             <div className="size-9 rounded-lg bg-white text-black grid place-items-center">
               <Globe2 className="size-5" />
             </div>
-            <span className="text-lg font-semibold tracking-tight">{brand.name}</span>
+            <span className="text-lg font-semibold tracking-tight">SitePlus</span>
           </div>
           <span className="text-sm text-white/70">Beta</span>
         </div>
@@ -382,10 +266,13 @@ export default function LandingPrototype() {
                               Your site is being prepared
                             </h3>
                             <p className="text-sm text-black/80 mb-3 text-center">
-                              To access your control panel and view your upcoming website, please enter your email. We’ll notify you as soon as it’s ready.
+                              Enter your email to get access info.
                             </p>
                             <div className="text-xs text-black/70 mb-2 text-center">
-                              Domain: <span className="font-semibold text-black">{suggestSubdomainFromIdea(idea)}</span>
+                              Domain:{" "}
+                              <span className="font-semibold text-black">
+                                {suggestSubdomainFromIdea(idea)}
+                              </span>
                             </div>
                             <Input
                               ref={emailInputRef}
@@ -398,7 +285,11 @@ export default function LandingPrototype() {
                               placeholder="you@example.com"
                               className="h-12 rounded-xl bg-white text-black placeholder:text-black/60 border border-black/10 text-base"
                             />
-                            {emailErr && <div className="text-red-500 text-xs mt-1 text-center">{emailErr}</div>}
+                            {emailErr && (
+                              <div className="text-red-500 text-xs mt-1 text-center">
+                                {emailErr}
+                              </div>
+                            )}
                             <Button
                               onClick={submitEmail}
                               disabled={sending}
@@ -409,9 +300,6 @@ export default function LandingPrototype() {
                             <div className="text-[11px] text-black/60 mt-2 text-center">
                               No spam — we’ll only send essential access information.
                             </div>
-                            <div className="text-[11px] text-black/60 mt-1 text-center">
-                              By submitting, you consent to sending your idea and email to our internal inbox for review.
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -421,12 +309,12 @@ export default function LandingPrototype() {
               </CardContent>
             </Card>
           </div>
-          <p className="mt-10 text-sm text-white/70 max-w-xl leading-relaxed text-center">{brand.legal.disclaimer}</p>
         </section>
       </main>
+
       <footer className="mt-12 border-t border-white/10 bg-black/80">
         <div className="mx-auto max-w-3xl px-4 py-7 text-sm text-white/70 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span>© 2025 {brand.name}</span>
+          <span>© 2025 SitePlus</span>
           <span className="text-center sm:text-right">Beta • Transparent • Privacy First</span>
         </div>
       </footer>
