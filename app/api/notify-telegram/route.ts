@@ -1,9 +1,15 @@
 // app/api/notify-telegram/route.ts
 import { NextResponse } from "next/server";
 
-// Гарантируем отсутствие кеша и всегда динамический ответ
+// Всегда динамически, без кэша
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function trimStr(v: unknown, max = 800) {
+  if (typeof v !== "string") return "";
+  const s = v.trim();
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +17,6 @@ export async function POST(req: Request) {
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
-
     if (!token || !chatId) {
       return NextResponse.json(
         { error: "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" },
@@ -19,17 +24,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✂️ НИКАКИХ domain/locale/ua/time — только минимум
-    // Формат:
-    // 🆕 Новая заявка
-    // Email: <email>        // если есть
-    // Описание: <idea>      // если есть
-    const lines: string[] = ["🆕 Новая заявка"];
-    if (kind === "email" && typeof email === "string" && email.trim()) {
-      lines.push(`Email: ${email.trim()}`);
-    }
-    if (typeof idea === "string" && idea.trim()) {
-      lines.push(`Описание: ${idea.trim()}`);
+    const cleanIdea = trimStr(idea);
+    const cleanEmail = trimStr(email, 256);
+
+    // Форматируем 2 вида сообщений
+    // 1) первичное (только описание)
+    // 2) вторичное (добавлен email)
+    let lines: string[] = [];
+
+    if (kind === "email" && cleanEmail) {
+      // Дополнение
+      lines = [
+        "✨ Новая заявка • Дополнение",
+        `📧 Email: ${cleanEmail}`,
+        cleanIdea ? `📝 Описание: ${cleanIdea}` : undefined,
+      ].filter(Boolean) as string[];
+    } else {
+      // Первый вход
+      lines = [
+        "✨ Новая заявка • Первый вход",
+        cleanIdea ? `📝 Описание: ${cleanIdea}` : "📝 Описание: —",
+      ];
     }
 
     const text = lines.join("\n");
@@ -38,7 +53,7 @@ export async function POST(req: Request) {
     const tgRes = await fetch(tgUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Без Markdown/HTML — plain text
+      // Без Markdown/HTML — надёжный plain text
       body: JSON.stringify({ chat_id: chatId, text }),
       cache: "no-store",
     });
