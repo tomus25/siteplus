@@ -3,7 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script";
 
-const GA_ID = "G-0FVQQFK96Q"; // твой Measurement ID GA4
+const GA_ID = "G-QJFFDJ1HFM"; // твой Measurement ID GA4
 
 export const metadata: Metadata = {
   title: "SitePlus — Instant Website Prototype",
