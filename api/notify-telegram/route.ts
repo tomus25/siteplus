@@ -1,59 +1,47 @@
-import { NextRequest, NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
+// app/api/notify-telegram/route.ts
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { kind, idea, email, domain } = await req.json();
+    const { kind, idea, email } = await req.json();
 
-    // Гео/ИП без запроса геолокации
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      (req as any).ip || "unknown";
-    const country =
-      req.headers.get("x-vercel-ip-country") || "unknown";
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
 
-    // Валидация по типам событий
-    if (kind === "idea") {
-      if (!idea) return NextResponse.json({ error: "Missing idea" }, { status: 400 });
-    } else if (kind === "email") {
-      if (!email || !/.+@.+\\..+/.test(email)) {
-        return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-      }
-    } else {
-      return NextResponse.json({ error: "Unknown kind" }, { status: 400 });
+    if (!token || !chatId) {
+      return NextResponse.json(
+        { error: "Server is not configured: missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" },
+        { status: 500 }
+      );
     }
 
-    // Формируем разные тексты для TG
-    const text =
-      kind === "idea"
-        ? `New visit (partial):
-• Idea: ${idea || "(empty)"}
-• Domain: ${domain}
-• IP: ${ip}
-• Country: ${country}`
-        : `New submission (full):
-• Idea: ${idea || "(empty)"}
-• Email: ${email}
-• Domain: ${domain}
-• IP: ${ip}
-• Country: ${country}`;
+    // Текст «минимализм»: три пункта. Если email нет — только 2 пункта.
+    const lines: string[] = ["🆕 Новая заявка"];
+    if (kind === "email" && email) {
+      lines.push(`Email: ${String(email).trim()}`);
+    }
+    if (idea) {
+      lines.push(`Описание: ${String(idea).trim()}`);
+    }
 
-    const token = process.env.TELEGRAM_BOT_TOKEN!;
-    const chatId = process.env.TELEGRAM_CHAT_ID!;
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    const text = lines.join("\n");
 
-    const tgRes = await fetch(url, {
+    const tgUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+    const tgRes = await fetch(tgUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: String(chatId), text }),
+      // Без форматирования, чтобы не было сюрпризов с Markdown/HTML
+      body: JSON.stringify({ chat_id: chatId, text }),
+      cache: "no-store",
     });
+
     if (!tgRes.ok) {
-      const dbg = await tgRes.text();
-      return NextResponse.json({ error: "Telegram error", dbg }, { status: 502 });
+      const err = await tgRes.text();
+      return NextResponse.json({ error: `Telegram error: ${err}` }, { status: 502 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+    return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 400 });
   }
 }
